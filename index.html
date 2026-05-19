@@ -44,16 +44,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .suggest-list{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #007B7B;border-radius:8px;z-index:100;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,80,80,.15);display:none}
 .suggest-list.open{display:block}
 .suggest-item{padding:11px 14px;border-bottom:1px solid #e8f0f0;cursor:pointer;font-size:14px;font-weight:600;color:#111}
+.suggest-item:active{background:#e0f2f2}
 .search-results{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #007B7B;border-radius:8px;z-index:100;max-height:300px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,80,80,.18);display:none}
 .search-results.open{display:block}
 .search-item{padding:13px 14px;border-bottom:1px solid #e8f0f0;cursor:pointer}
+.search-item:active{background:#e0f2f2}
 .search-item .si-desc{font-size:14px;font-weight:700;color:#111}
 .search-item .si-stock{font-size:11px;color:#007B7B;font-weight:700;margin-top:2px}
 .search-item .si-avail{font-size:12px;margin-top:3px}
 .search-item .avail{color:#065f46;font-weight:800}
+.search-item .total{color:#aaa}
+.searching{padding:14px;font-size:13px;color:#888;text-align:center}
 .selected-box{background:#e6f5f5;border:1.5px solid #007B7B;border-radius:8px;padding:10px 12px;margin-bottom:10px}
 .selected-box .sd{font-size:14px;font-weight:700;color:#007B7B}
 .selected-box .ss{font-size:11px;color:#005a5a;font-weight:700;margin-top:2px}
+.selected-box .sa{font-size:12px;color:#065f46;font-weight:700;margin-top:2px}
 .qty-row{display:flex;align-items:flex-end;gap:10px}
 .qty-inp{width:100px;padding:12px;border:1.5px solid #c8dede;border-radius:8px;font-size:16px;color:#111;outline:none}
 .qty-inp:focus{border-color:#007B7B}
@@ -74,6 +79,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div class="tab active" id="tab-new"  onclick="switchTab('new')">New Request</div>
   <div class="tab"        id="tab-view" onclick="switchTab('view')">View Requests</div>
 </div>
+
 <div class="screen active" id="screen-new">
   <div class="card">
     <div class="card-title">Request Details</div>
@@ -94,14 +100,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <div class="card-title">Add Items <span class="badge" id="item-count">0</span></div>
     <div class="frow" style="position:relative">
       <div class="lbl">Search Item (any stock)</div>
-      <input class="inp" id="desc-search" placeholder="Type to search — e.g. battery, inverter..." oninput="onSearchInput()" autocomplete="off">
+      <input class="inp" id="desc-search" placeholder="Type to search — e.g. battery, HYS, inverter..." oninput="onSearchInput()" autocomplete="off">
       <div class="search-results" id="search-results"></div>
     </div>
     <div id="selected-item-row" style="display:none;margin-bottom:10px">
       <div class="selected-box">
         <div class="sd" id="selected-item-name"></div>
         <div class="ss" id="selected-item-stock"></div>
-        <div style="font-size:12px;color:#065f46;font-weight:700;margin-top:2px" id="selected-item-avail"></div>
+        <div class="sa" id="selected-item-avail"></div>
       </div>
       <div class="qty-row">
         <div><div class="lbl">Quantity</div><input class="qty-inp" id="item-qty" type="number" min="1" placeholder="Qty" onkeydown="if(event.key==='Enter')addItem()"></div>
@@ -113,12 +119,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div id="submit-result"></div>
   <button class="btn-main dark" id="btn-submit" onclick="submitRequest()">Submit Material Request</button>
 </div>
+
 <div class="screen" id="screen-view">
   <div style="padding-top:4px">
     <button class="btn-sm" onclick="loadRequests()">Refresh</button>
-    <div id="req-list" style="margin-top:12px"><div style="text-align:center;padding:24px;color:#aaa;font-size:13px">Tap Refresh to load</div></div>
+    <div id="req-list" style="margin-top:12px">
+      <div style="text-align:center;padding:24px;color:#aaa;font-size:13px">Tap Refresh to load</div>
+    </div>
   </div>
 </div>
+
 <div class="toast" id="toast"></div>
 <script>
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbySOouAh5kY_GfLmLbEgoalb7WrL3aFizz0g4SzwcciYLXJOKYb9vsy1s4OeF7Fys-_Ng/exec';
@@ -128,8 +138,10 @@ var searchTimer = null;
 var endClientHistory = JSON.parse(localStorage.getItem('ssolsEndClients') || '[]');
 
 document.addEventListener('click', function(e) {
-  if (!e.target.closest('#desc-search') && !e.target.closest('#search-results')) document.getElementById('search-results').classList.remove('open');
-  if (!e.target.closest('#req-endclient') && !e.target.closest('#endclient-suggest')) document.getElementById('endclient-suggest').classList.remove('open');
+  if (!e.target.closest('#desc-search') && !e.target.closest('#search-results'))
+    document.getElementById('search-results').classList.remove('open');
+  if (!e.target.closest('#req-endclient') && !e.target.closest('#endclient-suggest'))
+    document.getElementById('endclient-suggest').classList.remove('open');
 });
 
 function switchTab(tab) {
@@ -153,11 +165,16 @@ function onEndClientInput() {
   if (!val) { el.classList.remove('open'); return; }
   var matches = endClientHistory.filter(function(n){ return n.toLowerCase().indexOf(val) >= 0; });
   if (!matches.length) { el.classList.remove('open'); return; }
-  el.innerHTML = matches.map(function(m){ return '<div class="suggest-item" onclick="pickEndClient(''+esc(m)+'')">'+esc(m)+'</div>'; }).join('');
+  el.innerHTML = matches.map(function(m){
+    return '<div class="suggest-item" onclick="pickEndClient(''+esc(m)+'')">'+esc(m)+'</div>';
+  }).join('');
   el.classList.add('open');
 }
 
-function pickEndClient(name) { document.getElementById('req-endclient').value = name; document.getElementById('endclient-suggest').classList.remove('open'); }
+function pickEndClient(name) {
+  document.getElementById('req-endclient').value = name;
+  document.getElementById('endclient-suggest').classList.remove('open');
+}
 
 function saveEndClient(name) {
   if (!name || endClientHistory.indexOf(name) >= 0) return;
@@ -170,31 +187,37 @@ function onSearchInput() {
   clearTimeout(searchTimer);
   var q = document.getElementById('desc-search').value.trim();
   if (q.length < 2) { document.getElementById('search-results').classList.remove('open'); return; }
-  document.getElementById('search-results').innerHTML = '<div style="padding:14px;font-size:13px;color:#888;text-align:center">Searching...</div>';
+  document.getElementById('search-results').innerHTML = '<div class="searching">Searching all stocks...</div>';
   document.getElementById('search-results').classList.add('open');
   searchTimer = setTimeout(function() {
     callGAS('searchDescription', {query: q}, function(res) {
-      var results = res.results || [];
-      var el = document.getElementById('search-results');
-      if (!results.length) { el.innerHTML='<div style="padding:14px;font-size:13px;color:#888;text-align:center">No matches</div>'; return; }
-      el.innerHTML = results.map(function(r) {
-        return '<div class="search-item" onclick="selectItem(''+esc(r.description)+'',''+esc(r.stockSheet)+'','+r.available+','+r.total+')">'+
-          '<div class="si-desc">'+esc(r.description)+'</div>'+
-          '<div class="si-stock">'+esc(r.stockSheet)+'</div>'+
-          '<div class="si-avail"><span class="avail">'+r.available+' available</span></div>'+
-        '</div>';
-      }).join('');
+      renderSearchResults(res.results || []);
     });
   }, 300);
 }
 
-function selectItem(desc, stockSheet, available) {
+function renderSearchResults(results) {
+  var el = document.getElementById('search-results');
+  if (!results.length) { el.innerHTML='<div class="searching">No matches found</div>'; el.classList.add('open'); return; }
+  el.innerHTML = results.map(function(r) {
+    var noStock = r.available === 0;
+    return '<div class="search-item" onclick="selectItem(''+esc(r.description)+'',''+esc(r.stockSheet)+'','+r.available+','+r.total+')">'+
+      '<div class="si-desc">'+esc(r.description)+'</div>'+
+      '<div class="si-stock">'+esc(r.stockSheet)+'</div>'+
+      '<div class="si-avail"><span class="avail">'+r.available+' available</span> <span class="total">of '+r.total+'</span>'+
+      (noStock?' — <span style="color:#991b1b;font-weight:700">None in stock</span>':'')+
+      '</div></div>';
+  }).join('');
+  el.classList.add('open');
+}
+
+function selectItem(desc, stockSheet, available, total) {
   selectedDesc = desc; selectedStock = stockSheet; selectedAvail = available;
   document.getElementById('desc-search').value = desc;
   document.getElementById('search-results').classList.remove('open');
   document.getElementById('selected-item-name').textContent = desc;
   document.getElementById('selected-item-stock').textContent = stockSheet;
-  document.getElementById('selected-item-avail').textContent = available + ' available';
+  document.getElementById('selected-item-avail').textContent = available + ' available in stock';
   document.getElementById('selected-item-row').style.display = 'block';
   document.getElementById('item-qty').value = '';
   document.getElementById('item-qty').focus();
@@ -209,7 +232,8 @@ function addItem() {
   document.getElementById('desc-search').value = '';
   document.getElementById('item-qty').value = '';
   document.getElementById('selected-item-row').style.display = 'none';
-  renderItems(); toast('Item added','ok');
+  renderItems();
+  toast('Item added','ok');
 }
 
 function renderItems() {
@@ -217,7 +241,11 @@ function renderItems() {
   document.getElementById('item-count').textContent = lineItems.length;
   if (!lineItems.length) { el.innerHTML=''; return; }
   el.innerHTML = lineItems.map(function(it,i){
-    return '<div class="item-row"><div class="item-body"><div class="ds">'+esc(it.description)+'</div><div class="ss">'+esc(it.stockSheet)+'</div><div class="qty">Qty: '+it.quantity+'</div></div><button class="rm-btn" data-idx="'+i+'" onclick="lineItems.splice(parseInt(this.dataset.idx),1);renderItems()">x</button></div>';
+    return '<div class="item-row"><div class="item-body">'+
+      '<div class="ds">'+esc(it.description)+'</div>'+
+      '<div class="ss">'+esc(it.stockSheet)+'</div>'+
+      '<div class="qty">Qty: '+it.quantity+'</div>'+
+    '</div><button class="rm-btn" data-idx="'+i+'" onclick="lineItems.splice(parseInt(this.dataset.idx),1);renderItems()">x</button></div>';
   }).join('');
 }
 
@@ -231,7 +259,10 @@ function submitRequest() {
   if (!lineItems.length) { toast('Add at least one item','err'); return; }
   var btn = document.getElementById('btn-submit');
   btn.disabled=true; btn.innerHTML='<span class="spin"></span> Submitting...';
-  callGAS('submitMaterialRequest', {stockType:lineItems[0].stockSheet||'', clientName:endclient, endClientName:endclient, doNumber:staffCode, requestorName:name, lineItems:lineItems}, function(res) {
+  callGAS('submitMaterialRequest', {
+    stockType: lineItems[0].stockSheet||'', clientName: endclient,
+    endClientName: endclient, doNumber: staffCode, requestorName: name, lineItems: lineItems
+  }, function(res) {
     btn.disabled=false; btn.innerHTML='Submit Material Request';
     if (res.ok) {
       saveEndClient(endclient);
@@ -253,7 +284,9 @@ function loadRequests() {
     if (!items.length) { el.innerHTML='<div style="text-align:center;padding:24px;color:#aaa;font-size:13px">No pending requests.</div>'; return; }
     el.innerHTML = items.map(function(it){
       var deliver = it.endClientName || it.clientName || '';
-      var lines = (it.lineItems||[]).map(function(l){ return '<div class="req-item"><span class="req-qty-badge">'+l.quantity+'</span>'+esc(l.description)+'</div>'; }).join('');
+      var lines = (it.lineItems||[]).map(function(l){
+        return '<div class="req-item"><span class="req-qty-badge">'+l.quantity+'</span>'+esc(l.description)+(l.stockSheet?' <span style="font-size:10px;color:#888;">('+esc(l.stockSheet)+')</span>':'')+'</div>';
+      }).join('');
       return '<div class="req-row"><div class="req-deliver">'+esc(deliver)+'</div>'+lines+'<div class="req-meta">By '+esc(it.requestor)+' — '+esc(it.timestamp)+'</div></div>';
     }).join('');
   });
