@@ -178,7 +178,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 <div class="toast" id="toast"></div>
 <script>
-var GAS_URL = 'https://script.google.com/macros/s/AKfycby-O4wilx6QxedwgcAMbvIgAYVdztd_JiyNM1JUDBRsh9EokopWFeVEBJedkvZtMa13ww/exec';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbzYlfSMio86VuYPtysStqvlONJUvMZY81Av_ySu1C20Q84OfB1rPeVNOhcPyI6Veyr6DQ/exec';
 var lineItems=[],selectedDesc='',selectedStock='',selectedAvail=0,searchTimer=null,stockTimer=null;
 var currentMode='client';
 var endClientHistory=JSON.parse(localStorage.getItem('ssolsEndClients')||'[]');
@@ -392,9 +392,9 @@ function exportCSV(){
   var headers=['GIV','GIV Date','GRV','Date In','Client','Description','Type','Part No','P/O No','P/L No','Contract No','Serial No','Location','Qty','Stock Sheet'];
   var lines=[headers.join(',')];
   _histResults.forEach(function(r){
-    lines.push([r.giv,r.givDate,r.grv,r.dateIn,r.client,r.description,r.type,r.partNo,r.poNo,r.plNo,r.contractNo,r.serialNo,r.location,'1',r.stockSheet].map(function(v){return '"'+(v||'').toString().replace(/"/g,'""')+'"';}).join(','));
+    lines.push([r.giv,r.givDate,r.grv,r.dateIn,r.client,r.description,r.type,r.partNo,r.poNo,r.plNo,r.contractNo,'="'+( r.serialNo||'').toString().replace(/"/g,'""')+'"',r.location,'1',r.stockSheet].map(function(v,i){return i===11?v:'"'+(v||'').toString().replace(/"/g,'""')+'"';}).join(','));
   });
-  var blob=new Blob([lines.join('\n')],{type:'text/csv'});
+  var blob=new Blob(['\uFEFF'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download='GIV_History_'+new Date().toISOString().split('T')[0]+'.csv';a.click();
 }
