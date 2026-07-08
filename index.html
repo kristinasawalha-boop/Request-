@@ -20,6 +20,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .btn-main{width:100%;padding:14px;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px}.btn-main.dark{background:#005a5a}.btn-main:disabled{background:#b0c8c8;cursor:not-allowed}
 .btn-sm{padding:8px 14px;background:#e0f2f2;border:none;border-radius:7px;color:#007B7B;font-size:13px;font-weight:700;cursor:pointer}
 .btn-csv{padding:7px 12px;background:#e0f2f2;border:none;border-radius:7px;color:#007B7B;font-size:12px;font-weight:700;cursor:pointer}
+.btn-csv.teal{background:#007B7B;color:#fff}
 .item-row{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #e8f0f0;gap:8px}.item-row:last-child{border-bottom:none}
 .item-body{flex:1}.item-body .ds{font-size:14px;font-weight:600;color:#111}.item-body .ss{font-size:11px;color:#007B7B;font-weight:700;margin-top:2px}.item-body .qty{font-size:12px;color:#555;margin-top:2px}
 .rm-btn{background:none;border:none;color:#c02020;font-size:20px;cursor:pointer;padding:2px 8px;flex-shrink:0}
@@ -68,6 +69,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .serial-card{background:#e0f2f2;border:1.5px solid #007B7B;border-radius:10px;padding:14px;margin-bottom:8px}
 .serial-card .sc-label{font-size:11px;font-weight:700;color:#007B7B;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
 .serial-card .sc-val{font-size:14px;font-weight:700;color:#111}
+/* At Dispatch serial list */
+.dispatch-box{background:#fff8e1;border:1.5px solid #f0c040;border-radius:10px;padding:12px;margin-bottom:12px}
+.dispatch-box-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.dispatch-box-title{font-size:12px;font-weight:800;color:#92660a;text-transform:uppercase;letter-spacing:.4px}
+.dispatch-serial-row{padding:8px 0;border-bottom:1px solid #f0e8c0}
+.dispatch-serial-row:last-child{border-bottom:none}
+.dispatch-serial-row .dsr-desc{font-size:13px;font-weight:600;color:#111}
+.dispatch-serial-row .dsr-sn{font-family:monospace;font-size:12px;color:#555;margin-top:2px}
+.dispatch-serial-row .dsr-client{font-size:11px;color:#007B7B;font-weight:700;margin-top:2px}
 </style>
 </head>
 <body>
@@ -110,8 +120,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 <!-- VIEW REQUESTS -->
 <div class="screen" id="screen-view">
-  <div style="padding-top:4px"><button class="btn-sm" onclick="loadRequests()">Refresh</button>
-    <div id="req-list" style="margin-top:12px"><div class="empty-state">Tap Refresh to load</div></div>
+  <div style="padding-top:4px">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <button class="btn-sm" onclick="loadRequests()">Refresh</button>
+      <button class="btn-csv teal" onclick="loadAtDispatchSerials()">&#11015; Items at Dispatch (CSV)</button>
+    </div>
+    <div id="dispatch-serials-area"></div>
+    <div id="req-list"><div class="empty-state">Tap Refresh to load</div></div>
   </div>
 </div>
 
@@ -148,14 +163,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         <p class="mb-title">Track an item</p><p class="mb-sub">Enter serial number</p>
       </div>
     </div>
-
     <div id="hist-client-panel">
       <div style="display:flex;gap:8px">
         <input class="inp" id="hist-client-inp" placeholder="Client name..." autocomplete="off" style="flex:1" onkeydown="if(event.key==='Enter')runHistory()">
         <button class="btn-sm" onclick="runHistory()">Search</button>
       </div>
     </div>
-
     <div id="hist-date-panel" style="display:none">
       <div class="date-row">
         <input type="date" class="date-inp" id="hist-date-from">
@@ -164,7 +177,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         <button class="btn-sm" onclick="runHistory()">Search</button>
       </div>
     </div>
-
     <div id="hist-track-panel" style="display:none">
       <div style="display:flex;gap:8px">
         <input class="inp" id="hist-serial-inp" placeholder="Serial number..." autocomplete="off" style="flex:1" onkeydown="if(event.key==='Enter')runHistory()">
@@ -172,7 +184,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       </div>
     </div>
   </div>
-
   <div id="hist-result"></div>
 </div>
 
@@ -183,6 +194,7 @@ var lineItems=[],selectedDesc='',selectedStock='',selectedAvail=0,searchTimer=nu
 var currentMode='client';
 var endClientHistory=JSON.parse(localStorage.getItem('ssolsEndClients')||'[]');
 var _histResults=[];
+var _dispatchItems=[];
 
 document.addEventListener('click',function(e){
   if(!e.target.closest('#desc-search')&&!e.target.closest('#search-results'))document.getElementById('search-results').classList.remove('open');
@@ -298,6 +310,42 @@ function loadRequests(){
   });
 }
 
+// AT DISPATCH SERIALS
+function loadAtDispatchSerials(){
+  var area=document.getElementById('dispatch-serials-area');
+  area.innerHTML='<div class="empty-state">Loading items at dispatch...</div>';
+  callGAS('getAtDispatchAll',{clientName:''},function(res){
+    var items=res.items||[];
+    if(!items.length){
+      area.innerHTML='<div class="empty-state">No items currently at dispatch.</div>';
+      return;
+    }
+    _dispatchItems=items;
+    var rows=items.map(function(it){
+      return '<div class="dispatch-serial-row"><div class="dsr-desc">'+esc(it.description||'')+'</div><div class="dsr-sn">S/N: '+esc(it.serial||'')+'</div><div class="dsr-client">'+esc(it.clientName||'')+' &middot; '+esc(it.stockSheet||'')+'</div></div>';
+    }).join('');
+    area.innerHTML='<div class="dispatch-box"><div class="dispatch-box-hdr"><span class="dispatch-box-title">At Dispatch &mdash; '+items.length+' item'+(items.length===1?'':'s')+'</span><button class="btn-csv teal" onclick="exportDispatchCSV()">&#11015; Download CSV</button></div>'+rows+'</div>';
+  });
+}
+
+function exportDispatchCSV(){
+  if(!_dispatchItems.length)return;
+  var headers=['Client','Description','Serial No','Stock Sheet'];
+  var lines=[headers.join(',')];
+  _dispatchItems.forEach(function(it){
+    lines.push([
+      '"'+(it.clientName||'').replace(/"/g,'""')+'"',
+      '"'+(it.description||'').replace(/"/g,'""')+'"',
+      '="'+(it.serial||'').toString().replace(/"/g,'""')+'"',
+      '"'+(it.stockSheet||'').replace(/"/g,'""')+'"'
+    ].join(','));
+  });
+  var blob=new Blob(['\uFEFF'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='At_Dispatch_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click();
+}
+
 // STOCK
 function onStockSearch(){clearTimeout(stockTimer);stockTimer=setTimeout(loadStock,350);}
 function loadStock(){
@@ -327,19 +375,18 @@ function setMode(mode){
   });
   document.getElementById('hist-result').innerHTML='';
 }
-
 function runHistory(){
   var params={};
   if(currentMode==='client'){
     var c=document.getElementById('hist-client-inp').value.trim();
     if(!c){toast('Enter client name','err');return;}
     params={mode:'client',clientName:c};
-  } else if(currentMode==='date'){
+  }else if(currentMode==='date'){
     var from=document.getElementById('hist-date-from').value;
     var to=document.getElementById('hist-date-to').value;
     if(!from&&!to){toast('Select at least one date','err');return;}
     params={mode:'date',dateFrom:from,dateTo:to};
-  } else {
+  }else{
     var sn=document.getElementById('hist-serial-inp').value.trim();
     if(!sn){toast('Enter serial number','err');return;}
     params={mode:'serial',serialNo:sn};
@@ -351,48 +398,41 @@ function runHistory(){
     renderHistory(_histResults,currentMode);
   });
 }
-
 function renderHistory(results,mode){
   var el=document.getElementById('hist-result');
   if(!results.length){el.innerHTML='<div class="empty-state">No results found</div>';return;}
   var html='<div class="result-hdr"><span class="result-count">'+results.length+' result'+(results.length===1?'':'s')+'</span><button class="btn-csv" onclick="exportCSV()">&#11015; CSV</button></div>';
   html+='<div class="result-list">';
-
   results.forEach(function(r){
-    html+='<div class="result-row">';
-    html+='<div class="result-main">';
+    html+='<div class="result-row"><div class="result-main">';
     html+='<span class="result-giv">GIV-'+esc(r.giv)+'</span>';
-    if(r.givDate) html+='<span class="result-date">Out: '+esc(r.givDate)+'</span>';
-    if(mode==='date'||mode==='serial') html+='<span class="result-client">'+esc(r.client)+'</span>';
-    html+='<span class="result-desc">'+esc(r.description)+'</span>';
-    html+='</div>';
-
+    if(r.givDate)html+='<span class="result-date">Out: '+esc(r.givDate)+'</span>';
+    if(mode==='date'||mode==='serial')html+='<span class="result-client">'+esc(r.client)+'</span>';
+    html+='<span class="result-desc">'+esc(r.description)+'</span></div>';
     var details=[];
-    if(r.grv)        details.push('<b>GRV:</b> '+esc(r.grv));
-    if(r.dateIn)     details.push('<b>Date in:</b> '+esc(r.dateIn));
-    if(r.partNo)     details.push('<b>Part No:</b> '+esc(r.partNo));
-    if(r.type)       details.push('<b>Type:</b> '+esc(r.type));
-    if(r.serialNo)   details.push('<b>S/N:</b> '+esc(r.serialNo));
-    if(r.poNo)       details.push('<b>P/O:</b> '+esc(r.poNo));
-    if(r.plNo)       details.push('<b>P/L:</b> '+esc(r.plNo));
-    if(r.contractNo) details.push('<b>Contract:</b> '+esc(r.contractNo));
-    if(r.location)   details.push('<b>Location:</b> '+esc(r.location));
+    if(r.grv)details.push('<b>GRV:</b> '+esc(r.grv));
+    if(r.dateIn)details.push('<b>Date in:</b> '+esc(r.dateIn));
+    if(r.partNo)details.push('<b>Part No:</b> '+esc(r.partNo));
+    if(r.type)details.push('<b>Type:</b> '+esc(r.type));
+    if(r.serialNo)details.push('<b>S/N:</b> '+esc(r.serialNo));
+    if(r.poNo)details.push('<b>P/O:</b> '+esc(r.poNo));
+    if(r.plNo)details.push('<b>P/L:</b> '+esc(r.plNo));
+    if(r.contractNo)details.push('<b>Contract:</b> '+esc(r.contractNo));
+    if(r.location)details.push('<b>Location:</b> '+esc(r.location));
     details.push('<b>Qty:</b> 1');
-    if(r.stockSheet) details.push('<b>Stock:</b> '+esc(r.stockSheet));
-
-    if(details.length) html+='<div class="result-detail">'+details.join(' &nbsp;&middot;&nbsp; ')+'</div>';
+    if(r.stockSheet)details.push('<b>Stock:</b> '+esc(r.stockSheet));
+    if(details.length)html+='<div class="result-detail">'+details.join(' &nbsp;&middot;&nbsp; ')+'</div>';
     html+='</div>';
   });
   html+='</div>';
   el.innerHTML=html;
 }
-
 function exportCSV(){
   if(!_histResults.length)return;
   var headers=['GIV','GIV Date','GRV','Date In','Client','Description','Type','Part No','P/O No','P/L No','Contract No','Serial No','Location','Qty','Stock Sheet'];
   var lines=[headers.join(',')];
   _histResults.forEach(function(r){
-    lines.push([r.giv,r.givDate,r.grv,r.dateIn,r.client,r.description,r.type,r.partNo,r.poNo,r.plNo,r.contractNo,'="'+( r.serialNo||'').toString().replace(/"/g,'""')+'"',r.location,'1',r.stockSheet].map(function(v,i){return i===11?v:'"'+(v||'').toString().replace(/"/g,'""')+'"';}).join(','));
+    lines.push([r.giv,r.givDate,r.grv,r.dateIn,r.client,r.description,r.type,r.partNo,r.poNo,r.plNo,r.contractNo,'="'+(r.serialNo||'').toString().replace(/"/g,'""')+'"',r.location,'1',r.stockSheet].map(function(v,i){return i===11?v:'"'+(v||'').toString().replace(/"/g,'""')+'"';}).join(','));
   });
   var blob=new Blob(['\uFEFF'+lines.join('\n')],{type:'text/csv;charset=utf-8'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);
