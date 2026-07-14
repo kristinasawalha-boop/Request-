@@ -262,8 +262,7 @@ function exportDispatchCSV() {
         '"'+(r.stockSheet||'').replace(/"/g,'""')+'"'
       ].join(','));
     });
-    var blob = new Blob(['﻿'+lines.join('
-')], {type:'text/csv;charset=utf-8'});
+    var blob = new Blob([String.fromCharCode(65279)+lines.join('\n')], {type:'text/csv;charset=utf-8'});
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'At_Dispatch_'+new Date().toISOString().split('T')[0]+'.csv';
