@@ -240,9 +240,7 @@ function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'block';
   document.getElementById('main-tabs').style.display = 'flex';
-  // show all screens container
-  document.querySelectorAll('.screen').forEach(function(s){ s.style.display = 'none'; });
-  document.getElementById('screen-new').style.display = 'block';
+  switchTab('new');
 }
 
 // ============================================================
