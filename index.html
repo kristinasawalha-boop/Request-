@@ -36,6 +36,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .qty-row{display:flex;align-items:flex-end;gap:10px}.qty-inp{width:100px;padding:12px;border:1.5px solid #c8dede;border-radius:8px;font-size:16px;color:#111;outline:none}.qty-inp:focus{border-color:#007B7B}
 .btn-add{padding:12px 20px;background:#007B7B;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer}
 .req-row{background:#f8fffe;border:1.5px solid #c8dede;border-radius:10px;padding:12px;margin-bottom:8px}.req-deliver{font-size:16px;font-weight:700;color:#111;margin-bottom:2px}.req-meta{font-size:11px;color:#888;margin-top:6px}.req-item{font-size:13px;color:#444;padding:2px 0}.req-qty-badge{display:inline-block;background:#007B7B;color:#fff;border-radius:5px;padding:1px 7px;font-size:12px;font-weight:700;margin-right:5px}
+.req-status-badge{display:inline-block;border-radius:5px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:6px}
+.req-status-badge.completed{background:#d1fae5;color:#065f46}
+.req-status-badge.cancelled{background:#fee2e2;color:#991b1b}
 .mode-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px}
 .mode-btn{padding:9px 6px;border-radius:8px;border:1.5px solid #c8dede;text-align:center;cursor:pointer}
 .mode-btn.active{border-color:#007B7B;background:#e0f2f2}
@@ -68,6 +71,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .serial-card{background:#e0f2f2;border:1.5px solid #007B7B;border-radius:10px;padding:14px;margin-bottom:8px}
 .serial-card .sc-label{font-size:11px;font-weight:700;color:#007B7B;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
 .serial-card .sc-val{font-size:14px;font-weight:700;color:#111}
+
+.vendor-report-row{display:flex;gap:8px;margin-bottom:10px}
+.vendor-report-row select.inp{flex:1}
+.vendor-btn-row{display:flex;gap:8px}
+.vendor-btn-row .btn-csv{flex:1;padding:10px 8px;text-align:center}
+.reqhist-toggle{display:flex;gap:8px;margin-bottom:10px}
+.reqhist-toggle .btn-sm{flex-shrink:0}
+.reqhist-toggle .inp{flex:1}
 
 .login-screen{position:fixed;top:0;left:0;right:0;bottom:0;background:#f0f7f7;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
 .login-box{background:#fff;border-radius:16px;padding:28px 24px;width:100%;max-width:380px;box-shadow:0 4px 16px rgba(0,80,80,.12)}
@@ -107,6 +118,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       <div style="flex:1"><div class="lbl">Ordered By *</div><input class="inp" id="req-name" placeholder="Staff name" autocomplete="off"></div>
       <div style="width:120px"><div class="lbl">Staff Code *</div><input class="inp" id="req-staffcode" placeholder="e.g. M01" autocomplete="off"></div>
     </div>
+    <div class="frow"><div class="lbl">Delivery Date</div>
+      <input class="inp" id="req-deliverydate" type="date">
+      <div style="font-size:11px;color:#888;margin-top:4px">Defaults to tomorrow — change if needed</div>
+    </div>
   </div>
   <div class="card">
     <div class="card-title">Add Items <span class="badge" id="item-count">0</span></div>
@@ -126,8 +141,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 
 <!-- VIEW REQUESTS -->
 <div class="screen" id="screen-view">
-  <div style="padding-top:4px;display:flex;gap:8px"><button class="btn-sm" onclick="loadRequests()">Refresh</button><button class="btn-csv" onclick="exportDispatchCSV()">&#11015; At Dispatch CSV</button></div><div style="margin-top:0">
+  <div style="padding-top:4px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn-sm" onclick="loadRequests()">Refresh</button><button class="btn-csv" onclick="exportDispatchCSV()">&#11015; At Dispatch CSV</button></div>
+  <div style="margin-top:0">
     <div id="req-list" style="margin-top:12px"><div class="empty-state">Tap Refresh to load</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Request History</div>
+    <div class="reqhist-toggle">
+      <input class="inp" id="reqhist-client" placeholder="Filter by client (optional)..." autocomplete="off" onkeydown="if(event.key==='Enter')loadRequestHistory()">
+      <button class="btn-sm" onclick="loadRequestHistory()">Search</button>
+    </div>
+    <div style="font-size:11px;color:#888;margin-bottom:10px">Shows completed and cancelled requests exactly as originally submitted. Leave blank to see all.</div>
+    <div id="reqhist-list"><div class="empty-state">Search to load request history</div></div>
   </div>
 </div>
 
@@ -147,9 +173,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     </div>
   </div>
   <div id="stock-result"></div>
+
+  <div class="card">
+    <div class="card-title">Vendor Reports (native layout)</div>
+    <div class="vendor-report-row">
+      <select class="inp" id="vendor-report-select">
+        <option value="Huawei Stock">Huawei</option>
+        <option value="Hoymiles Stock">Hoymiles</option>
+        <option value="Chisage Stock">Chisage</option>
+        <option value="Longi Stock">Longi</option>
+      </select>
+    </div>
+    <div class="vendor-btn-row">
+      <button class="btn-csv" onclick="exportVendorCurrentStock()">&#11015; Current Stock CSV</button>
+      <button class="btn-csv" onclick="exportVendorDeliveryHistory()">&#11015; Delivery History CSV</button>
+    </div>
+    <div style="font-size:11px;color:#888;margin-top:8px">Current Stock = on hand + at dispatch (not yet issued). Delivery History = already issued/delivered. Both match your original sheet's column layout exactly.</div>
+  </div>
 </div>
 
-<!-- HISTORY -->
+<!-- HISTORY (GIV / delivery tracking) -->
 <div class="screen" id="screen-history">
   <div class="card">
     <div class="card-title">Delivery History</div>
@@ -240,7 +283,19 @@ function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('main-app').style.display = 'block';
   document.getElementById('main-tabs').style.display = 'flex';
+  setDefaultDeliveryDate();
   switchTab('new');
+}
+
+// ============================================================
+// DELIVERY DATE - defaults to tomorrow, editable
+// ============================================================
+function setDefaultDeliveryDate() {
+  var el = document.getElementById('req-deliverydate');
+  if (!el || el.value) return;
+  var tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  el.value = tomorrow.toISOString().split('T')[0];
 }
 
 // ============================================================
@@ -267,6 +322,34 @@ function exportDispatchCSV() {
     a.click();
   });
 }
+
+// ============================================================
+// v14: VENDOR REPORTS - native layout CSV, exact column order
+// ============================================================
+function _downloadVendorCSV(action, filePrefix) {
+  var sheetName = document.getElementById('vendor-report-select').value;
+  callGAS(action, {stockSheet: sheetName}, function(res) {
+    if (!res.ok) { toast(res.msg || 'Error loading report', 'err'); return; }
+    if (!res.headers || !res.headers.length || !res.rows.length) { toast('No rows found for ' + sheetName, 'warn'); return; }
+    var lines = [res.headers.map(function(h){ return '"'+(h||'').replace(/"/g,'""')+'"'; }).join(',')];
+    res.rows.forEach(function(row) {
+      lines.push(row.map(function(cell, idx) {
+        // Serial No column: force text so leading zeros / long numbers don't get mangled by Excel
+        if (res.headers[idx] === 'Serial No') return '="'+(cell||'').toString().replace(/"/g,'""')+'"';
+        return '"'+(cell||'').toString().replace(/"/g,'""')+'"';
+      }).join(','));
+    });
+    var blob = new Blob([String.fromCharCode(65279)+lines.join('\n')], {type:'text/csv;charset=utf-8'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    var vendorLabel = sheetName.replace(/\s+Stock$/,'').replace(/\s+/g,'_');
+    a.download = filePrefix + '_' + vendorLabel + '_' + new Date().toISOString().split('T')[0] + '.csv';
+    a.click();
+  });
+}
+function exportVendorCurrentStock() { _downloadVendorCSV('getVendorCurrentStock', 'Current_Stock'); }
+function exportVendorDeliveryHistory() { _downloadVendorCSV('getVendorDeliveryHistory', 'Delivery_History'); }
+
 var lineItems=[],selectedDesc='',selectedStock='',selectedAvail=0,searchTimer=null,stockTimer=null;
 var currentMode='client';
 var endClientHistory=JSON.parse(localStorage.getItem('ssolsEndClients')||'[]');
@@ -354,18 +437,20 @@ function submitRequest(){
   var endclient=document.getElementById('req-endclient').value.trim();
   var name=document.getElementById('req-name').value.trim();
   var staffCode=document.getElementById('req-staffcode').value.trim();
+  var deliveryDate=document.getElementById('req-deliverydate').value;
   if(!endclient){toast('Enter Deliver To','err');return;}
   if(!name){toast('Enter staff name','err');return;}
   if(!staffCode){toast('Enter staff code','err');return;}
   if(!lineItems.length){toast('Add at least one item','err');return;}
   var btn=document.getElementById('btn-submit');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Submitting...';
-  callGAS('submitMaterialRequest',{stockType:lineItems[0].stockSheet||'',clientName:endclient,endClientName:endclient,doNumber:staffCode,requestorName:name,lineItems:lineItems},function(res){
+  callGAS('submitMaterialRequest',{stockType:lineItems[0].stockSheet||'',clientName:endclient,endClientName:endclient,doNumber:staffCode,requestorName:name,lineItems:lineItems,deliveryDate:deliveryDate},function(res){
     btn.disabled=false;btn.innerHTML='Submit Material Request';
     if(res.ok){
       saveEndClient(endclient);
       document.getElementById('submit-result').innerHTML='<div class="alert-box ok">Request submitted! Operations notified.</div>';
       lineItems=[];renderItems();
       document.getElementById('req-endclient').value='';document.getElementById('req-name').value='';document.getElementById('req-staffcode').value='';
+      setDefaultDeliveryDate();
       setTimeout(function(){document.getElementById('submit-result').innerHTML='';},5000);
     }else{toast(res.msg||'Error','err');}
   });
@@ -381,7 +466,27 @@ function loadRequests(){
     el.innerHTML=items.map(function(it){
       var deliver=it.endClientName||it.clientName||'';
       var lines=(it.lineItems||[]).map(function(l){return '<div class="req-item"><span class="req-qty-badge">'+l.quantity+'</span>'+esc(l.description)+'</div>';}).join('');
-      return '<div class="req-row"><div class="req-deliver">'+esc(deliver)+'</div>'+lines+'<div class="req-meta">By '+esc(it.requestor)+' &middot; '+esc(it.timestamp)+'</div></div>';
+      var deliveryLine = it.deliveryDate ? (' &middot; Delivery: '+esc(it.deliveryDate)) : '';
+      return '<div class="req-row"><div class="req-deliver">'+esc(deliver)+'</div>'+lines+'<div class="req-meta">By '+esc(it.requestor)+' &middot; '+esc(it.timestamp)+deliveryLine+'</div></div>';
+    }).join('');
+  });
+}
+
+// v14: REQUEST HISTORY (completed/cancelled, as originally submitted)
+function loadRequestHistory(){
+  var client = document.getElementById('reqhist-client').value.trim();
+  document.getElementById('reqhist-list').innerHTML='<div class="empty-state">Loading...</div>';
+  callGAS('getRequestHistory',{clientName:client},function(res){
+    var el=document.getElementById('reqhist-list');
+    if(!res.ok){el.innerHTML='<div class="empty-state">Error loading history</div>';return;}
+    var items=res.items||[];
+    if(!items.length){el.innerHTML='<div class="empty-state">No history found.</div>';return;}
+    el.innerHTML=items.map(function(it){
+      var deliver=it.endClientName||it.clientName||'';
+      var lines=(it.lineItems||[]).map(function(l){return '<div class="req-item"><span class="req-qty-badge">'+l.quantity+'</span>'+esc(l.description)+'</div>';}).join('');
+      var deliveryLine = it.deliveryDate ? (' &middot; Delivery: '+esc(it.deliveryDate)) : '';
+      var statusClass = it.status==='Completed' ? 'completed' : 'cancelled';
+      return '<div class="req-row"><div class="req-deliver">'+esc(deliver)+'<span class="req-status-badge '+statusClass+'">'+esc(it.status)+'</span></div>'+lines+'<div class="req-meta">By '+esc(it.requestor)+' &middot; '+esc(it.timestamp)+deliveryLine+'</div></div>';
     }).join('');
   });
 }
@@ -406,7 +511,7 @@ function loadStock(){
   });
 }
 
-// HISTORY
+// HISTORY (GIV / delivery tracking)
 function setMode(mode){
   currentMode=mode;
   ['client','date','track'].forEach(function(m){
