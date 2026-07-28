@@ -171,6 +171,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
         <option>Longi Stock</option>
       </select>
     </div>
+    <button class="btn-csv" onclick="exportStockSummary()" style="width:100%;margin-top:2px">&#11015; Stock Summary CSV</button>
   </div>
   <div id="stock-result"></div>
 
@@ -493,12 +494,14 @@ function loadRequestHistory(){
 
 // STOCK
 function onStockSearch(){clearTimeout(stockTimer);stockTimer=setTimeout(loadStock,350);}
+var _lastStockResults=[];
 function loadStock(){
   var search=document.getElementById('stock-search').value.trim();
   var sheet=document.getElementById('stock-sheet-filter').value;
   document.getElementById('stock-result').innerHTML='<div class="empty-state">Loading...</div>';
   callGAS('getStockSummary',{stockSheet:sheet,search:search},function(res){
     var el=document.getElementById('stock-result');
+    _lastStockResults=(res.ok&&res.results)?res.results:[];
     if(!res.ok||!res.results.length){el.innerHTML='<div class="empty-state">No items found</div>';return;}
     var html='<div class="stock-list"><div class="stock-hdr"><span>Description</span><span style="text-align:center">On hand</span><span style="text-align:center">At dispatch</span></div>';
     res.results.forEach(function(r){
@@ -509,6 +512,23 @@ function loadStock(){
     html+='</div>';
     el.innerHTML=html;
   });
+}
+function exportStockSummary(){
+  if(!_lastStockResults.length){toast('No stock list loaded - search or select a vendor first','warn');return;}
+  var headers=['Description','Part No','Stock Sheet','On Hand','At Dispatch'];
+  var lines=[headers.map(function(h){return '"'+h+'"';}).join(',')];
+  _lastStockResults.forEach(function(r){
+    lines.push([r.description,r.partNo,r.stockSheet,r.onHand,r.atDispatch].map(function(cell){
+      return '"'+(cell===undefined||cell===null?'':cell.toString()).replace(/"/g,'""')+'"';
+    }).join(','));
+  });
+  var blob=new Blob([String.fromCharCode(65279)+lines.join('\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  var sheetFilter=document.getElementById('stock-sheet-filter').value;
+  var label=sheetFilter?sheetFilter.replace(/\s+Stock$/,'').replace(/\s+/g,'_'):'All_Stock';
+  a.download='Stock_Summary_'+label+'_'+new Date().toISOString().split('T')[0]+'.csv';
+  a.click();
 }
 
 // HISTORY (GIV / delivery tracking)
